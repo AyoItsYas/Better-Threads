@@ -1,7 +1,6 @@
 import threading
 import time
 from typing import Callable
-import discord
 
 
 class ThreadPool:
@@ -64,7 +63,7 @@ class ThreadPool:
         for thread in self.threads.values():
             thread["data"]["pause"] = False
 
-    def thread(self, *, pipe_out, pipe_in: dict = None, start: bool = False):
+    def thread(self, *, pipe_in: dict = None, start: bool = False, pipe_out: Callable = lambda *args, **kwargs: None):
         """A function Decorator. Function should take 1 keyword argument 'data: dict = None'"""
         def wrap(func: Callable, *args, **kwargs):
             if pipe_in is None:
@@ -107,9 +106,15 @@ class ThreadPool:
                         pass
                     if pipe_in("terminate"):
                         break
-                    ret = func(data=data)
+
+                    try:
+                        ret = func(data=dict())
+                    except TypeError:
+                        raise TypeError("Given function should take 1 keyword argument 'data'")
+
+                    if ret:
+                        data.update(ret)
                     data["iterations"] += 1
-                    data.update(ret)
                     pipe_out(data)
 
                 finished_at = time.time()
@@ -130,6 +135,7 @@ class ThreadPool:
             }
             if start:
                 thread.start()
+            return func
         return wrap
 
     def get_id(self) -> int:
@@ -137,9 +143,7 @@ class ThreadPool:
 
     def get_thread(self, func: Callable = None, *, thread_id: str = None):
         if func is not None:
-            print(0)
             for thread_id, thread in self.threads.items():
-                print(func == thread["func"])
                 if func == thread["func"]:
                     return thread
         return self.threads.get(thread_id)

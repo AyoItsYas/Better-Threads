@@ -1,3 +1,6 @@
+# Better Threads
+Ever wanted to pause, stop, resume ot pipe data between threads? This python module extends control over threads. Example usage,
+```py
 import time
 from BetterThreads import ThreadPool
 
@@ -13,3 +16,5 @@ def test_loop(data):
 thread_pool.start(test_loop)
 time.sleep(5)
 thread_pool.stop(test_loop)
+```
+More exmples https://github.com/ItsYasiru/Better-Threads/examples

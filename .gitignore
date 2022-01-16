@@ -1,6 +1,7 @@
 dist/
 __pycache__/
 .exclude/
+build.bat
 *.json
 *.py[cod]
 *.log
