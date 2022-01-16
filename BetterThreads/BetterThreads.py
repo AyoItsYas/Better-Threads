@@ -19,11 +19,18 @@ class ThreadPool:
         if x:
             x["data"]["terminate"] = True
 
-    def pause(self, func: Callable = None, *, thread_id: str = None):
+    def pause(self, func: Callable = None, *, thread_id: str = None, resume_in: int = None):
         """Pause a thread"""
+        def resume_dummy():
+            time.sleep(resume_in)
+            self.resume(func)
+
         x = self.get_thread(func, thread_id=thread_id)
         if x:
             x["data"]["pause"] = True
+
+        if resume_in:
+            threading.Thread(target=resume_dummy).start()
 
     def resume(self, func: Callable = None, *, thread_id: str = None):
         """Resume a paused thread"""
