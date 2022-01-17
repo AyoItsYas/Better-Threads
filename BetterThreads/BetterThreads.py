@@ -70,22 +70,14 @@ class ThreadPool:
         for thread in self.threads.values():
             thread["data"]["pause"] = False
 
-    def thread(self, *, pipe_in: dict = None, start: bool = False, pipe_out: Callable = lambda *args, **kwargs: None):
-        """A function Decorator. Function should take 1 keyword argument 'data: dict = None'"""
-        def wrap(func: Callable, *args, **kwargs):
-            if pipe_in is None:
-                data = {
-                    "pause": False,
-                    "terminate": False
-                }
-                pipe = ThreadPool.get_pipe(lambda: data, pipe_out)
-            else:
-                pipe = pipe_in
-
-            _kwargs = list(kwargs.get("args", tuple()))
-            _kwargs.insert(0, pipe)
-            _kwargs = tuple(_kwargs)
-            kwargs["args"] = _kwargs
+    def thread(self, *args, **kwargs):
+        """A function Decorator. Calls the given function on each thread cycle."""
+        def wrap(func):
+            data = {
+                "iterations": 0,
+                "terminate": False
+            }
+            pipe = self.get_pipe(lambda: data)
 
             def worker(pipe):
                 def pipe_in(key: str = None):
@@ -102,46 +94,22 @@ class ThreadPool:
                 def pipe_out(data, *, finished: bool = None):
                     return pipe(data, finished=finished)
 
-                data = {
-                    "started_at": time.time(),
-                    "iterations": 0
-                }
-                data = pipe_out(data)
-
                 while not pipe_in("terminate"):
                     while pipe_in("pause") and not pipe_in("terminate"):
                         pass
                     if pipe_in("terminate"):
                         break
 
-                    try:
-                        ret = func(data=dict())
-                    except TypeError:
-                        raise TypeError("Given function should take 1 keyword argument 'data'")
+                    func(*args, **kwargs)
 
-                    if ret:
-                        data.update(ret)
-                    data["iterations"] += 1
-                    pipe_out(data)
-
-                finished_at = time.time()
-
-                data.update({
-                    "finished_at": finished_at,
-                    "runtime": finished_at - data["started_at"]
-                })
-                pipe_out(data, finished=True)
-
-            thread = threading.Thread(target=worker, *args, **kwargs)
+            thread = threading.Thread(target=worker, args=(pipe,))
             thread_id = self.get_id()
 
             self.threads[thread_id] = {
-                "data": pipe_in() if pipe_in else data,
+                "data": data,
                 "func": func,
                 "thread": thread
             }
-            if start:
-                thread.start()
             return func
         return wrap
 
@@ -156,7 +124,7 @@ class ThreadPool:
         return self.threads.get(thread_id)
 
     @staticmethod
-    def get_pipe(pipe_in: Callable, pipe_out: Callable):
+    def get_pipe(pipe_in: Callable, pipe_out: Callable = lambda data: None):
         """Builds a pipe function to pipe data between the main thread and the thread"""
         def pipe(data: dict = None, *, finished: bool = None):
             if data and finished:
