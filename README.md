@@ -2,7 +2,7 @@
 Ever wanted to pause, stop, resume or pipe data between threads? Well this module does exactly that.
 
 ## Key features
-- Pass data between threads
+- Pipe data between threads
 - Pause, Resume and Stop threads
 - Simple
 ## Installing

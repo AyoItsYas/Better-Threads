@@ -1,3 +1,7 @@
+""""
+You could certainly get away with this if you use globals but this might come in handy if you have multiple variables
+"""
+
 import time
 from BetterThreads import ThreadPool
 
