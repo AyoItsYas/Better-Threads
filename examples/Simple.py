@@ -5,7 +5,7 @@ thread_pool = ThreadPool()
 
 
 @thread_pool.thread()
-def test_loop(data):
+def test_loop():
     print("Loop running!")
     time.sleep(1)
 
