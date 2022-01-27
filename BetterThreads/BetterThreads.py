@@ -1,5 +1,6 @@
 import threading
 import time
+
 from typing import Callable
 
 
@@ -7,39 +8,42 @@ class ThreadPool:
     def __init__(self) -> None:
         self.threads: dict[str, dict] = dict()
 
+    def __len__(self) -> int:
+        return len(self.threads)
+
     def start(self, func: Callable = None, *, thread_id: str = None):
         """Starts the thread"""
-        x = self.get_thread(func, thread_id=thread_id)
-        if x:
-            x["thread"].start()
+        thread_data = self.get_thread(func, thread_id=thread_id)
+        if thread_data:
+            thread_data["thread"].start()
 
-    def stop(self, func: Callable = None, *, thread_id: str = None):
-        """Stops a running thread"""
-        x = self.get_thread(func, thread_id=thread_id)
-        if x:
-            x["data"]["terminate"] = True
+    def terminate(self, func: Callable = None, *, thread_id: str = None):
+        """Terminates a running thread"""
+        thread_data = self.get_thread(func, thread_id=thread_id)
+        if thread_data:
+            thread_data["data"]["terminate"] = True
 
     def pause(self, func: Callable = None, *, thread_id: str = None, resume_in: int = None):
-        """Pause a thread"""
+        """Pause a running thread"""
         def resume_dummy():
             time.sleep(resume_in)
             self.resume(func)
 
-        x = self.get_thread(func, thread_id=thread_id)
-        if x:
-            x["data"]["pause"] = True
+        thread_data = self.get_thread(func, thread_id=thread_id)
+        if thread_data:
+            thread_data["data"]["pause"] = True
 
         if resume_in:
             threading.Thread(target=resume_dummy).start()
 
     def resume(self, func: Callable = None, *, thread_id: str = None):
         """Resume a paused thread"""
-        x = self.get_thread(func, thread_id=thread_id)
-        if x:
-            x["data"]["pause"] = False
+        thread_data = self.get_thread(func, thread_id=thread_id)
+        if thread_data:
+            thread_data["data"]["pause"] = False
 
-    def stop_all(self, *, wait: bool = None, timeout: int = None):
-        """Stops all threads in the pool"""
+    def terminate_all(self, *, wait: bool = None, timeout: int = None):
+        """Terminates all running threads"""
         threads = self.threads.copy()
 
         for thread_id, thread in threads.items():
@@ -48,7 +52,7 @@ class ThreadPool:
 
         if wait:
             start = time.time()
-            while any(x["thread"].is_alive() for x in threads.values()):
+            while any(thread_data["thread"].is_alive() for thread_data in threads.values()):
                 if timeout:
                     if time.time() - start > timeout:
                         raise Exception("Timeout")
@@ -71,10 +75,10 @@ class ThreadPool:
             thread["data"]["pause"] = False
 
     def thread(self, *args, **kwargs):
-        """A function Decorator. Calls the given function on each thread cycle."""
+        """A function Decorator, calls the given function on each thread cycle. Parameters to the function can be passed."""
         def wrap(func):
             data = {
-                "iterations": 0,
+                "pause": False,
                 "terminate": False
             }
             pipe = self.get_pipe(lambda: data)
