@@ -1,5 +1,5 @@
 # Better Threads
-Ever wanted to pause, stop, resume or pipe data between threads? Well this module does exactly that. 
+Ever wanted to pause, stop, resume or pipe data between threads? Well this module does exactly that.
 
 ## Key features
 - Pass data between threads
@@ -20,7 +20,7 @@ thread_pool = ThreadPool()
 
 
 @thread_pool.thread()
-def test_loop(data):
+def test_loop():
     print("Loop running!")
     time.sleep(1)
 
