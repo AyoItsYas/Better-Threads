@@ -31,5 +31,5 @@ thread_pool.pause(test_loop)
 time.sleep(5)
 thread_pool.resume(test_loop)
 time.sleep(5)
-thread_pool.stop(test_loop)
+thread_pool.terminate(test_loop)
 ```
