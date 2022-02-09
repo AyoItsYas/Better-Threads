@@ -1,9 +1,8 @@
 import threading
 import time
-
 from typing import Callable
 
-from errors import TimeOut
+from .errors import TimeOut
 
 
 class ThreadPool:
