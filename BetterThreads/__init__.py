@@ -1,6 +1,10 @@
-__version__ = "0.3.0"
-from .BetterThreads import ThreadPool
+__version__ = "0.3.1"
+
+import errors
+
+from .ThreadPool import ThreadPool
 
 __all__ = [
+    errors,
     ThreadPool
 ]
