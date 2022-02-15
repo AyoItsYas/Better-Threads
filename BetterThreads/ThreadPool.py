@@ -26,14 +26,17 @@ class ThreadPool:
 
     def thread(self):
         def wrapper(func: Union[Callable, PooledThread], *args, **kwargs):
-            with self.__lock:
-                if isinstance(func, PooledThread):
-                    self.__threads[func.__target] = func
-                else:
-                    thread = PooledThread(func, *args, **kwargs)
-                    self.__threads[func] = thread
-                    return thread
+            self.add_thread(func, *args, **kwargs)
         return wrapper
+
+    def add_thread(self, func: Union[Callable, PooledThread], *args, **kwargs):
+        with self.__lock:
+            if isinstance(func, PooledThread):
+                self.__threads[func.__target] = func
+            else:
+                thread = PooledThread(func, *args, **kwargs)
+                self.__threads[func] = thread
+                return thread
 
     def terminate(self, func: Callable = None, block: bool = None, timeout: int = None):
         thread = self.get_thread(func)
