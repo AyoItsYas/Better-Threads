@@ -1,9 +1,9 @@
-__version__ = "0.3.2"
-
-from .errors import TimeOut
+from .PooledThread import PooledThread
 from .ThreadPool import ThreadPool
 
+
+__version__ = "2.0.0"
 __all__ = [
-    ThreadPool,
-    TimeOut
+    PooledThread,
+    ThreadPool
 ]
