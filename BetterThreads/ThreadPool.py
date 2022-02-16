@@ -32,7 +32,7 @@ class ThreadPool:
     def add_thread(self, func: Union[Callable, PooledThread], *args, **kwargs):
         with self.__lock:
             if isinstance(func, PooledThread):
-                self.__threads[func.__target] = func
+                self.__threads[func._PooledThread__target] = func
             else:
                 thread = PooledThread(func, *args, **kwargs)
                 self.__threads[func] = thread
@@ -99,9 +99,10 @@ class ThreadPool:
         if block:
             while any(thread.is_paused() for thread in self.__threads.values()): pass
 
-    def get_thread(self, func: Callable = None) -> Union[PooledThread, None]:
+    def get_thread(self, func: Union[Callable, PooledThread] = None) -> Union[PooledThread, None]:
         for thread in self.__threads.values():
-            if func == thread.__target: return thread
+            if func == thread._PooledThread__target: return thread
+            if func == thread: return thread
 
     @staticmethod
     def get_pipe(feed, pipe_out):
