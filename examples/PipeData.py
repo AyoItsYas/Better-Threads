@@ -1,27 +1,19 @@
-""""
-You could certainly get away with this if you use globals but this might come in handy if you have multiple variables
-"""
-
 import time
-from BetterThreads import ThreadPool
+from BetterThreads import ThreadPool, Pipe
 
-thread_pool = ThreadPool()
-
-data = {
-    "count": 0
-}
-pipe = thread_pool.get_pipe(lambda: data)
+thread_pool, pipe = ThreadPool(), Pipe()
 
 
 @thread_pool.thread()
 def test_loop():
-    data = pipe()
-    data["count"] += 1
-    print(f"Loop running! {data.get('count')}")
+    data: int = pipe.recv()
+    data += 1
+    print(f"Loop running! data: {data}")
     time.sleep(1)
+    pipe.send(data)
 
 
-thread_pool.start(test_loop)
-time.sleep(5)
-thread_pool.stop(test_loop)
-print(data)
+test_loop.start()
+pipe.send(0)
+print(f"Received! data: {pipe.recv()}")
+test_loop.terminate()

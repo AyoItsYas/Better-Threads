@@ -10,6 +10,6 @@ def test_loop():
     time.sleep(1)
 
 
-thread_pool.start(test_loop)
+test_loop.start(test_loop)
 time.sleep(5)
-thread_pool.stop(test_loop)
+test_loop.terminate(test_loop)
