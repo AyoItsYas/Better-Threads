@@ -117,8 +117,10 @@ class ThreadPool:
         if block:
             while any(thread.is_paused() for thread in self.__threads.values()): pass
 
-    def get_thread(self, func: Callable = None) -> Union[PooledThread, None]:
+    def get_thread(self, func: Callable = None, checks: list = list(), check: Callable = None) -> Union[PooledThread, None]:
         """Get the `Thread` object from a function."""
         self._update()
+        if check: checks.append(check)
         for thread in self.__threads.values():
             if func == thread._PooledThread__target: return thread
+            if any(_(func, thread) for _ in checks): return thread
