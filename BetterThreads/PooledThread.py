@@ -5,7 +5,7 @@ from typing import Callable
 
 class PooledThread(Thread):
     """A thread that can be paused, resumed and terminated."""
-    def __init__(self, target: Callable, *args, **kwargs):
+    def __init__(self, target: Callable, *, name: str = None, args: tuple = tuple(), kwargs: dict = dict()):
         self.__args = args
         self.__kwargs = kwargs
         self.__target: Callable = target
@@ -17,7 +17,7 @@ class PooledThread(Thread):
         self.__sleep: bool = False
         self.__execution_event: Condition = Condition(self.__lock)
 
-        super().__init__(target=self.control_wrapper)
+        super().__init__(target=self.control_wrapper, name=name)
 
     def is_asleep(self):
         """Returns if the thread is sleeping or not."""
