@@ -123,6 +123,6 @@ class ThreadPool:
         """Get the `Thread` object from a function."""
         self._update()
         if check: checks.append(check)
-        for thread in self.__threads.values() + self.__dead_threads.values():
+        for thread in list(self.__threads.values()) + list(self.__dead_threads.values()):
             if func == thread._PooledThread__target: return thread
             if any(_(func, thread) for _ in checks): return thread
