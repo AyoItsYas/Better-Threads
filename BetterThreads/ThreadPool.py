@@ -50,7 +50,7 @@ class ThreadPool:
                 self.__threads[func] = thread
                 return thread
 
-    def terminate(self, func: Callable = None, block: bool = None, timeout: int = None):
+    def terminate(self, func: Union[Callable, PooledThread] = None, block: bool = None, timeout: int = None):
         thread = self.get_thread(func)
 
         if thread:
@@ -71,7 +71,7 @@ class ThreadPool:
                     if time.time() - start > timeout: break
             with self.__lock: self.__threads = dict()
 
-    def pause(self, func: Callable = None, *, resume_in: int = None, block: bool = True, timeout: int = None):
+    def pause(self, func: Union[Callable, PooledThread] = None, *, resume_in: int = None, block: bool = True, timeout: int = None):
         def resume_dummy():
             time.sleep(resume_in)
             thread.resume()
@@ -90,9 +90,9 @@ class ThreadPool:
             time.sleep(resume_in)
             self.resume_all(block=False)
 
+        self._update()
         for thread in self.__threads.values():
             thread.pause(block=False)
-        self._update()
 
         if resume_in: Thread(target=dummy_thread).start()
 
@@ -101,8 +101,9 @@ class ThreadPool:
             while any(not thread.is_paused() for thread in self.__threads.values()):
                 if timeout:
                     if time.time() - start > timeout: break
+        self._update()
 
-    def resume(self, func: Callable = None):
+    def resume(self, func: Union[Callable, PooledThread] = None):
         thread = self.get_thread(func)
 
         if thread: thread.resume()
@@ -110,17 +111,18 @@ class ThreadPool:
 
     def resume_all(self, *, block: bool = True):
         """Resume all the threads in the pool"""
-        for thread in self.__threads.values():
-            thread.pause(block=False)
         self._update()
+        for thread in self.__dead_threads.values():
+            thread.resume(block=False)
 
         if block:
             while any(thread.is_paused() for thread in self.__threads.values()): pass
+        self._update()
 
-    def get_thread(self, func: Callable = None, checks: list = list(), check: Callable = None) -> Union[PooledThread, None]:
+    def get_thread(self, func: Union[Callable, PooledThread] = None, checks: list = list(), check: Callable = None) -> Union[PooledThread, None]:
         """Get the `Thread` object from a function."""
         self._update()
         if check: checks.append(check)
-        for thread in self.__threads.values():
+        for thread in self.__threads.values() + self.__dead_threads.values():
             if func == thread._PooledThread__target: return thread
             if any(_(func, thread) for _ in checks): return thread

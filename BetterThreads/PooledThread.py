@@ -3,6 +3,9 @@ from threading import Condition, Lock, Thread
 from typing import Callable
 
 
+class SkipCycle(Exception): pass
+
+
 class PooledThread(Thread):
     """A thread that can be paused, resumed and terminated."""
     def __init__(self, target: Callable, *, name: str = None, args: tuple = tuple(), kwargs: dict = dict()):
@@ -64,9 +67,19 @@ class PooledThread(Thread):
         with self.__lock:
             self.__execution_event.wait(timeout=timeout)
 
+    def cycle_check(self):
+        if self.__pause or self.__sleep or self.__terminate: raise SkipCycle("Cycle check failure!")
+
+    def skip_cycle(self):
+        """Raises an error to break the thread cycle."""
+        raise SkipCycle
+
     def control_wrapper(self):
         """A simple function to wrap the original target around to gain control."""
         while not self.__terminate:
-            self.__target(*self.__args, **self.__kwargs)
+            try:
+                self.__target(*self.__args, **self.__kwargs)
+            except SkipCycle:
+                pass
             with self.__lock: self.__execution_event.notify()
             while self.__pause or self.__sleep: pass
