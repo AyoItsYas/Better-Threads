@@ -1,5 +1,6 @@
 # Better Threads
-Ever wanted to pause, stop, resume or pipe data between threads? Well this module does exactly that.
+
+A wrapper over threads that provides extended control. The module supports pausing, terminating and putting threads to sleep. The module also provides some additional tools to Pipe data between threads and a thread pool to keep track of threads.
 
 ## Key features
 - Pipe data between threads
