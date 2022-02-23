@@ -1,5 +1,5 @@
 import time
-from threading import Thread, Lock
+from threading import Lock, Thread
 from typing import Callable, Union
 
 from BetterThreads.PooledThread import PooledThread
@@ -9,46 +9,51 @@ class ThreadPool:
     def __init__(self):
         """A simple thread manager."""
         self.__lock: Lock = Lock()
-        self.__threads: dict[Callable, PooledThread] = dict()
-        self.__dead_threads: dict[Callable, PooledThread] = dict()
+        self.__threads: list[PooledThread] = list()
 
     def __len__(self):
-        self._update()
+        """Number of threads in the pool."""
+        self.update()
         return len(self.__threads)
 
     @property
     def threads(self):
         """Number of threads in the pool."""
-        self._update()
-        return len(self)
+        return len(self.__threads)
 
-    def _update(self):
+    def update(self, thread: PooledThread = None):
         """Updates internal variables keeping track of threads in the pool."""
-        threads = self.__threads.copy()
-        for func, thread in threads.items():
+        if thread:
             if not thread.is_alive():
-                with self.__lock: self.__dead_threads[func] = self.__threads.pop(func)
+                with self.__lock: self.__threads.remove(thread)
+        else:
+            for thread in self.__threads.copy():
+                if not thread.is_alive():
+                    with self.__lock: self.__threads.remove(thread)
 
-        dead_threads = self.__dead_threads.copy()
-        for func, thread in dead_threads.items():
-            if thread.is_alive():
-                with self.__lock: self.__threads[func] = self.__dead_threads.pop(func)
-
-    def thread(self):
+    def thread(self, *args, **kwargs):
         """Function decorator to easily add a function as a thread to the pool."""
-        def wrapper(func: Union[Callable, PooledThread], *args, **kwargs):
+        def wrapper(func: Union[Callable, PooledThread]):
             return self.add_thread(func, *args, **kwargs)
         return wrapper
 
-    def add_thread(self, func: Union[Callable, PooledThread], *args, **kwargs):
+    def add_thread(self, func: Union[Callable, PooledThread], *args, **kwargs) -> Union[None, PooledThread]:
         """Add a function as a thread to the pool."""
-        with self.__lock:
-            if isinstance(func, PooledThread):
-                self.__threads[func._PooledThread__target] = func
-            else:
-                thread = PooledThread(func, *args, **kwargs)
-                self.__threads[func] = thread
-                return thread
+        thread = func if isinstance(func, PooledThread) else PooledThread(func, self, *args, **kwargs)
+        with self.__lock: self.__threads.append(thread)
+        return thread
+
+    def get_thread(
+        self,
+        func: Union[Callable, PooledThread] = None,
+        checks: list[Callable[[Callable, PooledThread], bool]] = list(),
+        check: Callable[[Callable, PooledThread], bool] = None
+    ) -> Union[None, PooledThread]:
+        """Get the `Thread` object from a function."""
+        if check: checks.append(check)
+        for thread in self.__threads:
+            if func == thread._PooledThread__target: return thread
+            if any(check(func, thread) for check in checks): return thread
 
     def terminate(self, func: Union[Callable, PooledThread] = None, block: bool = None, timeout: int = None):
         thread = self.get_thread(func)
@@ -56,17 +61,19 @@ class ThreadPool:
         if thread:
             thread.terminate(block=block, timeout=timeout)
             with self.__lock: del self.__threads[func]
-            self._update()
 
     def terminate_all(self, *, block: bool = True, timeout: int = None):
         """Terminates all threads in the pool"""
-        for thread in self.__threads.values():
-            thread.terminate(block=False)
-        self._update()
+        def check(thread: PooledThread):
+            if thread.is_asleep() or thread.is_paused():
+                return False
+
+        for thread in self.__threads:
+            thread.terminate()
 
         if block:
             start = time.time()
-            while any(thread.is_alive() for thread in self.__threads.values()):
+            while any(check(thread) for thread in self.__threads):
                 if timeout:
                     if time.time() - start > timeout: break
             with self.__lock: self.__threads = dict()
@@ -82,7 +89,6 @@ class ThreadPool:
             if resume_in:
                 Thread(target=resume_dummy).start()
             thread.pause(block=block, timeout=timeout)
-            self._update()
 
     def pause_all(self, *, resume_in: int = None, block: bool = True, timeout: int = None):
         """Pause all the threads in the pool"""
@@ -90,39 +96,26 @@ class ThreadPool:
             time.sleep(resume_in)
             self.resume_all(block=False)
 
-        self._update()
-        for thread in self.__threads.values():
+        for thread in self.__threads:
             thread.pause(block=False)
 
         if resume_in: Thread(target=dummy_thread).start()
 
         if block:
             start = time.time()
-            while any(not thread.is_paused() for thread in self.__threads.values()):
+            while any(not thread.is_paused() for thread in self.__threads):
                 if timeout:
                     if time.time() - start > timeout: break
-        self._update()
 
     def resume(self, func: Union[Callable, PooledThread] = None):
         thread = self.get_thread(func)
 
         if thread: thread.resume()
-        self._update()
 
     def resume_all(self, *, block: bool = True):
         """Resume all the threads in the pool"""
-        self._update()
-        for thread in self.__dead_threads.values():
-            thread.resume(block=False)
+        for thread in self.__threads:
+            thread.resume()
 
         if block:
-            while any(thread.is_paused() for thread in self.__threads.values()): pass
-        self._update()
-
-    def get_thread(self, func: Union[Callable, PooledThread] = None, checks: list = list(), check: Callable = None) -> Union[PooledThread, None]:
-        """Get the `Thread` object from a function."""
-        self._update()
-        if check: checks.append(check)
-        for thread in list(self.__threads.values()) + list(self.__dead_threads.values()):
-            if func == thread._PooledThread__target: return thread
-            if any(_(func, thread) for _ in checks): return thread
+            while any(thread.is_paused() for thread in self.__threads): pass

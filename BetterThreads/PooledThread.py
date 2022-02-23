@@ -1,6 +1,12 @@
+from __future__ import annotations
+
 import time
 from threading import Condition, Lock, Thread
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
+
+if TYPE_CHECKING:
+    from .ThreadPool import ThreadPool
+    from .Pipe import Pipe
 
 
 class SkipCycle(Exception): pass
@@ -8,9 +14,11 @@ class SkipCycle(Exception): pass
 
 class PooledThread(Thread):
     """A thread that can be paused, resumed and terminated."""
-    def __init__(self, target: Callable, *, name: str = None, args: tuple = tuple(), kwargs: dict = dict()):
+    def __init__(self, target: Callable, pool: ThreadPool, *, pipe: Pipe = None, name: str = None, args: tuple = tuple(), kwargs: dict = dict()):
         self.__args = args
         self.__kwargs = kwargs
+        self.__pool: ThreadPool = pool
+        self.__pipe: Pipe = pipe
         self.__target: Callable = target
 
         self.__lock: Lock = Lock()
@@ -30,20 +38,17 @@ class PooledThread(Thread):
         """Returns if the thread is paused or not."""
         return self.__pause
 
-    def is_alive(self):
-        """Returns if the thread is running or not."""
-        if self.__sleep or self.__pause: return False
-        return super().is_alive()
-
     def pause(self, *, block: bool = True, timeout: int = None):
         """Pause the execution of thread cycles."""
         with self.__lock: self.__pause = True
 
         if block: self.wait_cycle_execution(timeout=timeout)
 
-    def resume(self):
+    def resume(self, block: bool = True, timeout: int = None):
         """Resume the execution of thread cycles."""
         with self.__lock: self.__pause = False
+
+        if block: self.wait_cycle_execution(timeout=timeout)
 
     def sleep(self, seconds: int, *, block: bool = False, timeout: int = None):
         """Pause the thread for a given amount of seconds."""
@@ -68,6 +73,7 @@ class PooledThread(Thread):
             self.__execution_event.wait(timeout=timeout)
 
     def cycle_check(self):
+        """A check to be called internally."""
         if self.__pause or self.__sleep or self.__terminate: raise SkipCycle("Cycle check failure!")
 
     def skip_cycle(self):
@@ -76,10 +82,22 @@ class PooledThread(Thread):
 
     def control_wrapper(self):
         """A simple function to wrap the original target around to gain control."""
+        update = lambda: self.__pool.update(self)
+
+        update()
         while not self.__terminate:
             try:
-                self.__target(*self.__args, **self.__kwargs)
-            except SkipCycle:
+                result = self.__target(*self.__args, **self.__kwargs)  # Running the thread cycle
+                if result: self.__pipe.send(result)
+            except SkipCycle:  # An exception raised internally to terminate the cycle
                 pass
-            with self.__lock: self.__execution_event.notify()
-            while self.__pause or self.__sleep: pass
+
+            with self.__lock: self.__execution_event.notify()  # Notifing events waiting for cycle completion
+
+            if self.__pause or self.__sleep:
+                update()
+                while self.__pause or self.__sleep: pass
+                update()
+        else:
+            update()
+            del self.__target, self.__args, self.__kwargs
