@@ -1,4 +1,4 @@
-# Better Threads
+# Better-Threads
 
 A wrapper over threads that provides extended control. The module supports pausing, terminating and putting threads to sleep. The module also provides some additional tools to Pipe data between threads and a thread pool to keep track of threads.
 
